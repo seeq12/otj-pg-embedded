@@ -76,15 +76,17 @@ public class EmbeddedPostgres implements Closeable {
                      Optional<String> networkAlias,
                      DockerImageName image,
                      Duration pgStartupWait,
-                     String databaseName
+                     String databaseName,
+                     String username,
+                     String password
     ) throws IOException {
         LOG.trace("Starting containers with image {}, pgConfig {}, localeConfig {}, bindMounts {}, pgStartupWait {}, dbName {} ", image,
                 postgresConfig, localeConfig, bindMounts, pgStartupWait, databaseName);
         image = image.asCompatibleSubstituteFor(POSTGRES);
         this.postgreDBContainer = new PostgreSQLContainer<>(image)
                 .withDatabaseName(databaseName)
-                .withUsername(POSTGRES)
-                .withPassword(POSTGRES)
+                .withUsername(username)
+                .withPassword(password)
                 .withStartupTimeout(pgStartupWait)
                 .withLogConsumer(new Slf4jLogConsumer(LOG))
                 // https://github.com/docker-library/docs/blob/master/postgres/README.md#postgres_initdb_args
@@ -205,6 +207,8 @@ public class EmbeddedPostgres implements Closeable {
 
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
     public static class Builder {
+        private String username = POSTGRES;
+        private String password = POSTGRES;
         private final Map<String, String> config = new HashMap<>();
         private final Map<String, String> localeConfig = new HashMap<>();
         private final Map<String, BindMount> bindMounts = new HashMap<>();
@@ -281,6 +285,16 @@ public class EmbeddedPostgres implements Closeable {
             return setBindMount(BindMount.of(localFile, remoteFile, BindMode.READ_ONLY));
         }
 
+        public Builder setUsername(String username) {
+            this.username = username;
+            return this;
+        }
+
+        public Builder setPassword(String password) {
+            this.password = password;
+            return this;
+        }
+
         /**
          * Set up a bind mount between the local file system and the remote
          * @param bindMount object representing this bind
@@ -350,7 +364,7 @@ public class EmbeddedPostgres implements Closeable {
         }
 
         public EmbeddedPostgres start() throws IOException {
-            return new EmbeddedPostgres(config, localeConfig,  bindMounts, network, networkAlias, image, pgStartupWait, databaseName);
+            return new EmbeddedPostgres(config, localeConfig,  bindMounts, network, networkAlias, image, pgStartupWait, databaseName, username, password);
         }
 
         @Override
