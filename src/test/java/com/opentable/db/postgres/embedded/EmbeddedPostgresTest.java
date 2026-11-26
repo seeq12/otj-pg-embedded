@@ -19,6 +19,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
@@ -30,6 +32,7 @@ import javax.sql.DataSource;
 import org.apache.commons.lang3.SystemUtils;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.testcontainers.utility.DockerImageName;
 
 public class EmbeddedPostgresTest
@@ -116,6 +119,22 @@ public class EmbeddedPostgresTest
             db.close();
         }
 
+    }
+
+    @Test
+    public void testCopyToContainer(@TempDir Path initScripts) throws IOException, SQLException {
+        // The container's postgres user reads the copy, which keeps the modes it has here, like a bind mount would
+        assertTrue(initScripts.toFile().setReadable(true, false) && initScripts.toFile().setExecutable(true, false));
+        Files.write(initScripts.resolve("init.sql"), "CREATE TABLE copied (id int);".getBytes());
+        try (EmbeddedPostgres pg = EmbeddedPostgres.builder()
+                .copyToContainer(initScripts.toString(), "/docker-entrypoint-initdb.d")
+                .start();
+             Connection c = pg.getPostgresDatabase().getConnection();
+             Statement s = c.createStatement();
+             ResultSet rs = s.executeQuery("SELECT count(*) FROM copied")) {
+            assertTrue(rs.next());
+            assertEquals(0, rs.getInt(1));
+        }
     }
 
     @Test

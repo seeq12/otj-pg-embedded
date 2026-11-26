@@ -41,6 +41,7 @@ import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
+import org.testcontainers.utility.MountableFile;
 
 
 /**
@@ -72,6 +73,7 @@ public class EmbeddedPostgres implements Closeable {
     EmbeddedPostgres(Map<String, String> postgresConfig,
                      Map<String, String> localeConfig,
                      Map<String, BindMount> bindMounts,
+                     Map<String, String> copiesToContainer,
                      Optional<Network> network,
                      Optional<String> networkAlias,
                      DockerImageName image,
@@ -80,8 +82,8 @@ public class EmbeddedPostgres implements Closeable {
                      String username,
                      String password
     ) throws IOException {
-        LOG.trace("Starting containers with image {}, pgConfig {}, localeConfig {}, bindMounts {}, pgStartupWait {}, dbName {} ", image,
-                postgresConfig, localeConfig, bindMounts, pgStartupWait, databaseName);
+        LOG.trace("Starting containers with image {}, pgConfig {}, localeConfig {}, bindMounts {}, copiesToContainer {}, pgStartupWait {}, dbName {} ", image,
+                postgresConfig, localeConfig, bindMounts, copiesToContainer, pgStartupWait, databaseName);
         image = image.asCompatibleSubstituteFor(POSTGRES);
         this.postgreDBContainer = new PostgreSQLContainer(image)
                 .withDatabaseName(databaseName)
@@ -96,6 +98,8 @@ public class EmbeddedPostgres implements Closeable {
         cmd.addAll(createConfigOptions(postgresConfig));
         postgreDBContainer.setCommand(cmd.toArray(new String[0]));
         processBindMounts(postgreDBContainer, bindMounts);
+        copiesToContainer.forEach((remoteFile, localFile) ->
+                postgreDBContainer.withCopyFileToContainer(MountableFile.forHostPath(localFile), remoteFile));
         network.ifPresent(postgreDBContainer::withNetwork);
         networkAlias.ifPresent(postgreDBContainer::withNetworkAliases);
         postgreDBContainer.start();
@@ -212,6 +216,7 @@ public class EmbeddedPostgres implements Closeable {
         private final Map<String, String> config = new HashMap<>();
         private final Map<String, String> localeConfig = new HashMap<>();
         private final Map<String, BindMount> bindMounts = new HashMap<>();
+        private final Map<String, String> copiesToContainer = new HashMap<>();
         private Optional<Network> network = Optional.empty();
 
         private Duration pgStartupWait = DEFAULT_PG_STARTUP_WAIT;
@@ -283,6 +288,18 @@ public class EmbeddedPostgres implements Closeable {
          */
         public Builder setBindMount(String localFile, String remoteFile) {
             return setBindMount(BindMount.of(localFile, remoteFile, BindMode.READ_ONLY));
+        }
+
+        /**
+         * Copy a local file or directory into the container before it starts. Unlike a bind mount, this works where
+         * the Docker daemon cannot see the local file system, as with Docker on a Windows host or a remote daemon.
+         * @param localFile local file or directory
+         * @param remoteFile where it goes in the container
+         * @return builder
+         */
+        public Builder copyToContainer(String localFile, String remoteFile) {
+            copiesToContainer.put(remoteFile, localFile);
+            return this;
         }
 
         public Builder setUsername(String username) {
@@ -364,7 +381,7 @@ public class EmbeddedPostgres implements Closeable {
         }
 
         public EmbeddedPostgres start() throws IOException {
-            return new EmbeddedPostgres(config, localeConfig,  bindMounts, network, networkAlias, image, pgStartupWait, databaseName, username, password);
+            return new EmbeddedPostgres(config, localeConfig, bindMounts, copiesToContainer, network, networkAlias, image, pgStartupWait, databaseName, username, password);
         }
 
         @Override
@@ -376,12 +393,12 @@ public class EmbeddedPostgres implements Closeable {
                 return false;
             }
             Builder builder = (Builder) o;
-            return Objects.equals(config, builder.config) && Objects.equals(localeConfig, builder.localeConfig) && Objects.equals(bindMounts, builder.bindMounts) && Objects.equals(network, builder.network) && Objects.equals(pgStartupWait, builder.pgStartupWait) && Objects.equals(image, builder.image) && Objects.equals(databaseName, builder.databaseName) && Objects.equals(networkAlias, builder.networkAlias);
+            return Objects.equals(config, builder.config) && Objects.equals(localeConfig, builder.localeConfig) && Objects.equals(bindMounts, builder.bindMounts) && Objects.equals(copiesToContainer, builder.copiesToContainer) && Objects.equals(network, builder.network) && Objects.equals(pgStartupWait, builder.pgStartupWait) && Objects.equals(image, builder.image) && Objects.equals(databaseName, builder.databaseName) && Objects.equals(networkAlias, builder.networkAlias) && Objects.equals(username, builder.username) && Objects.equals(password, builder.password);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(config, localeConfig, bindMounts, network, pgStartupWait, image, databaseName, networkAlias);
+            return Objects.hash(config, localeConfig, bindMounts, copiesToContainer, network, pgStartupWait, image, databaseName, networkAlias, username, password);
         }
     }
 
