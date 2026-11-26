@@ -1,7 +1,48 @@
-1.0.3 (unreleased) 
+1.1.3
+-----
+* Upgrade the BasePOM parent for the current Maven Central Portal API.
+* Upgrade Flyway to 12.4.0 and remove Jackson 2 dependencies.
+
+1.1.2
+-----
+* Add the required Maven project name metadata for Central publication.
+* Default Docker image tag is now `17-alpine` (previously `13-alpine`).
+* Updated the build, CI workflow, documentation, and Liquibase test resource handling.
+* Breaking change: removed JUnit 4 rules; use the JUnit Jupiter extensions instead.
+* Dependency updates:
+
+* testcontainers 2.0.5
+* postgres JDBC 42.7.12
+* flyway 10.20.1
+* commons-lang 3.18.0
+* commons-compress 1.28.0
+* junit 5.11.4
+* slf4j 2.0.17
+* jackson 2.18.3
+
+1.1.1
+-----
+* Build and publication configuration updates.
+
+1.1.0
+-----
+* automatic modules
+* flyway 10.10. 
+  * Note this is now modularized as `flyway-core` and `flyway-database-postgresql`
+  * This brings in the `flyway-database-postgresql` and `jackson-dataformat-toml` as runtime optional dependencies.
+  * Note Flyway requires java 17
+
+Note for internal OT users: This is compatible with otj-SBT3, but not otj-SBT2.
+
+1.0.3
 ----
-* commons compress 1.24.0 (used by testcontainers) updated for a CVE.
-* testcontainers 1.19.0
+* commons compress 1.26.0 (used by testcontainers) updated for a CVE.
+* testcontainers 1.19.6
+* Additional options for configuring Flyway Preparer. In order of precedence (first is highest)
+  1. FlywayPreparer.fromClassPath has an optional first argument to specify a Map of Flyway configurations.
+  2. Environmental Variables. These are upper cases and periods converted to underscores.
+  3. Class Path - a file named `flyway.properties` in the class path.
+* Using more recently Flyway in tests.
 
 1.0.2
 -----

@@ -13,12 +13,14 @@
  */
 package com.opentable.db.postgres.embedded;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
@@ -28,17 +30,13 @@ import java.sql.Statement;
 import javax.sql.DataSource;
 
 import org.apache.commons.lang3.SystemUtils;
-import org.junit.Assume;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.testcontainers.utility.DockerImageName;
 
 public class EmbeddedPostgresTest
 {
-    @Rule
-    public TemporaryFolder tf = new TemporaryFolder();
-
     @Test
     public void testEmbeddedPg() throws Exception
     {
@@ -82,7 +80,7 @@ public class EmbeddedPostgresTest
     @Test
     public void testImageOptions() {
         // Ugly hack, since OT already has this defined as an ENV VAR, which can't really be cleared
-        Assume.assumeTrue(System.getenv(EmbeddedPostgres.ENV_DOCKER_PREFIX) ==  null);
+        Assumptions.assumeTrue(System.getenv(EmbeddedPostgres.ENV_DOCKER_PREFIX) == null);
         System.clearProperty(EmbeddedPostgres.ENV_DOCKER_PREFIX);
         System.clearProperty(EmbeddedPostgres.ENV_DOCKER_IMAGE);
 
@@ -121,6 +119,22 @@ public class EmbeddedPostgresTest
             db.close();
         }
 
+    }
+
+    @Test
+    public void testCopyToContainer(@TempDir Path initScripts) throws IOException, SQLException {
+        // The container's postgres user reads the copy, which keeps the modes it has here, like a bind mount would
+        assertTrue(initScripts.toFile().setReadable(true, false) && initScripts.toFile().setExecutable(true, false));
+        Files.write(initScripts.resolve("init.sql"), "CREATE TABLE copied (id int);".getBytes());
+        try (EmbeddedPostgres pg = EmbeddedPostgres.builder()
+                .copyToContainer(initScripts.toString(), "/docker-entrypoint-initdb.d")
+                .start();
+             Connection c = pg.getPostgresDatabase().getConnection();
+             Statement s = c.createStatement();
+             ResultSet rs = s.executeQuery("SELECT count(*) FROM copied")) {
+            assertTrue(rs.next());
+            assertEquals(0, rs.getInt(1));
+        }
     }
 
     @Test

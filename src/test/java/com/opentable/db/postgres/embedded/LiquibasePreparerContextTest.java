@@ -13,29 +13,33 @@
  */
 package com.opentable.db.postgres.embedded;
 
-import com.opentable.db.postgres.junit.EmbeddedPostgresRules;
-import com.opentable.db.postgres.junit.PreparedDbRule;
+import com.opentable.db.postgres.junit5.EmbeddedPostgresExtension;
+import com.opentable.db.postgres.junit5.PreparedDbExtension;
 import liquibase.Contexts;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class LiquibasePreparerContextTest {
-    @Rule
-    public PreparedDbRule db = EmbeddedPostgresRules.preparedDatabase(LiquibasePreparer.forClasspathLocation("liqui/master-test.xml", new Contexts("test")));
+  @RegisterExtension
+  static final PreparedDbExtension db = EmbeddedPostgresExtension.preparedDatabase(
+      LiquibasePreparer.forClasspathLocation("liqui/master-test.xml", new Contexts("test"))
+  );
 
-    @Test
-    public void testEmptyTables() throws Exception {
-        try (Connection c = db.getTestDatabase().getConnection();
-             Statement s = c.createStatement()) {
-            ResultSet rs = s.executeQuery("SELECT COUNT(*) FROM foo");
-            rs.next();
-            assertEquals(0, rs.getInt(1));
-        }
+  @Test
+  public void testEmptyTables() throws Exception {
+    try (Connection c = db.getTestDatabase().getConnection();
+         Statement s = c.createStatement();
+         ResultSet rs = s.executeQuery("SELECT COUNT(*) AS cnt FROM foo")) {
+
+      rs.next();
+      long count = rs.getLong("cnt");
+      assertEquals(0L, count);
     }
+  }
 }
